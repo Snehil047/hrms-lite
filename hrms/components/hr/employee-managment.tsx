@@ -53,7 +53,6 @@ import {
   Hash,
 } from "lucide-react";
 
-// Ensure you import addEmployeeApi alongside fetch and delete
 import {
   fetchEmployees,
   deleteEmployeeApi,
@@ -82,7 +81,6 @@ export function EmployeeManagement() {
 
   const [employeesList, setEmployeesList] = useState<Employee[]>([]);
 
-  // --- API: Load Employees ---
   const loadEmployees = useCallback(async () => {
     const apiResponse = await fetchEmployees();
     if (Array.isArray(apiResponse)) {
@@ -100,7 +98,6 @@ export function EmployeeManagement() {
     loadEmployees();
   }, [loadEmployees]);
 
-  // --- API: Delete Employee ---
   const handleDelete = async (emp_id: string) => {
     const success = await deleteEmployeeApi(emp_id);
     if (success) {
@@ -108,7 +105,6 @@ export function EmployeeManagement() {
     }
   };
 
-  // --- FORMIK: Add Employee ---
   const formik = useFormik({
     initialValues: {
       emp_id: "",
@@ -131,10 +127,8 @@ export function EmployeeManagement() {
       return errors;
     },
     onSubmit: async (values, { resetForm }) => {
-      // 1. Show loading toast
       const toastId = toast.loading("Adding employee...");
 
-      // 2. Call your POST API
       const apiResponse = await addEmployeeApi({
         emp_id: values.emp_id.trim(),
         name: values.name.trim(),
@@ -142,12 +136,11 @@ export function EmployeeManagement() {
         department: values.department,
       });
 
-      // 3. Handle response
       if (apiResponse) {
         toast.success("Employee added successfully!", { id: toastId });
         resetForm();
         setDialogOpen(false);
-        loadEmployees(); // Refresh the table
+        loadEmployees();
       } else {
         toast.error(
           "Failed to add employee. ID or Email might already exist.",

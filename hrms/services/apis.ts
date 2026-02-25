@@ -60,3 +60,33 @@ export const addEmployeeApi = async (formData: {
     return { success: false, message: "An unexpected error occurred" };
   }
 };
+
+export const getAllAttendanceApi = async () => {
+  try {
+    const { data } = await axios.get(`${API_BASE_URL}/attendance/`);
+    return data;
+  } catch (error) {
+    console.error("Failed to fetch attendance records.", error);
+    return null;
+  }
+};
+
+export const addAttendanceApi = async (formData: {
+  emp_id: string;
+  date: string;
+  status: string;
+}) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/attendance/`, formData);
+    return { success: true, data: response.data };
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as import("axios").AxiosError;
+      const errorMessage =
+        (axiosError?.response?.data as { detail?: string })?.detail ??
+        axiosError.message;
+      return { success: false, message: errorMessage };
+    }
+    return { success: false, message: "An unexpected error occurred" };
+  }
+};

@@ -100,6 +100,7 @@ def create_employee(employee: EmployeeCreate, db: Session = Depends(get_db)):
 def get_employees(db: Session = Depends(get_db)):
     return db.query(DBEmployee).all()
 
+
 @app.delete("/employees/{emp_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_employee(emp_id: str, db: Session = Depends(get_db)):
     db_emp = db.query(DBEmployee).filter(DBEmployee.emp_id == emp_id).first()
@@ -113,6 +114,10 @@ def delete_employee(emp_id: str, db: Session = Depends(get_db)):
     return None
 
 # --- 2. Attendance Management ---
+
+@app.get("/attendance/", response_model=List[AttendanceResponse])
+def get_attendance(db: Session = Depends(get_db)):
+    return db.query(DBAttendance).all()
 
 @app.post("/attendance/", response_model=AttendanceResponse, status_code=status.HTTP_201_CREATED)
 def mark_attendance(attendance: AttendanceCreate, db: Session = Depends(get_db)):

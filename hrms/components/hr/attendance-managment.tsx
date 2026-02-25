@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useHR } from "@/lib/hr-store";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { useFormik } from "formik";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,92 +32,109 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { CalendarCheck, Plus, CheckCircle2, XCircle, User } from "lucide-react";
+
 import {
-  CalendarCheck,
-  Plus,
-  Search,
-  Filter,
-  CheckCircle2,
-  XCircle,
-  User,
-} from "lucide-react";
+  fetchEmployees,
+  getAllAttendanceApi,
+  addAttendanceApi,
+} from "@/services/apis";
 
 export function AttendanceManagement() {
-  const { employees, attendance, markAttendance, getAttendanceByEmployee } =
-    useHR();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [status, setStatus] = useState<"Present" | "Absent">("Present");
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const [filterEmployee, setFilterEmployee] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  type Employee = {
+    emp_id: string;
+    name: string;
+    email: string;
+    department: string;
+  };
+  type Attendance = {
+    id?: number;
+    emp_id: string;
+    date: string;
+    status: string;
+  };
 
-  const filteredRecords = useMemo(() => {
-    let records = [...attendance].sort((a, b) => b.date.localeCompare(a.date));
+  const [employeesList, setEmployeesList] = useState<Employee[]>([]);
+  const [attendanceList, setAttendanceList] = useState<Attendance[]>([]);
 
-    if (filterEmployee !== "all") {
-      records = records.filter((r) => r.employeeId === filterEmployee);
-    }
-    if (filterStatus !== "all") {
-      records = records.filter((r) => r.status === filterStatus);
-    }
-    if (searchQuery.trim()) {
-      records = records.filter((r) => {
-        const emp = employees.find((e) => e.id === r.employeeId);
-        return (
-          emp?.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          r.employeeId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          r.date.includes(searchQuery)
-        );
+  const loadData = useCallback(async () => {
+    const emps = await fetchEmployees();
+    if (Array.isArray(emps)) setEmployeesList(emps);
+    else if (emps?.data && Array.isArray(emps.data))
+      setEmployeesList(emps.data);
+
+    const atts = await getAllAttendanceApi();
+    if (Array.isArray(atts)) setAttendanceList(atts);
+    else if (atts?.data && Array.isArray(atts.data))
+      setAttendanceList(atts.data);
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line
+    loadData();
+  }, [loadData]);
+
+  const formik = useFormik({
+    initialValues: {
+      emp_id: "",
+      date: new Date().toISOString().split("T")[0],
+      status: "Present",
+    },
+    validate: (values) => {
+      const errors: Record<string, string> = {};
+      if (!values.emp_id) errors.emp_id = "Please select an employee";
+      if (!values.date) errors.date = "Date is required";
+      return errors;
+    },
+    onSubmit: async (values, { resetForm }) => {
+      const toastId = toast.loading("Marking attendance...");
+
+      const apiResponse = await addAttendanceApi({
+        emp_id: values.emp_id,
+        date: values.date,
+        status: values.status,
       });
-    }
-    return records;
-  }, [attendance, employees, filterEmployee, filterStatus, searchQuery]);
+
+      if (apiResponse && apiResponse.success === true) {
+        toast.success("Attendance marked successfully!", { id: toastId });
+        resetForm();
+        setDialogOpen(false);
+        loadData();
+      } else {
+        toast.error(apiResponse?.message || "Failed to mark attendance.", {
+          id: toastId,
+        });
+      }
+    },
+  });
+
+  function getEmployeeName(emp_id: string) {
+    return employeesList.find((e) => e.emp_id === emp_id)?.name ?? "Unknown";
+  }
+
+  function getEmployeeInitials(emp_id: string) {
+    const name = getEmployeeName(emp_id);
+    return name === "Unknown"
+      ? "?"
+      : name
+          .split(" ")
+          .map((n) => n[0])
+          .join("")
+          .substring(0, 2);
+  }
+
+  const sortedRecords = useMemo(() => {
+    return [...attendanceList].sort((a, b) => b.date.localeCompare(a.date));
+  }, [attendanceList]);
 
   const stats = useMemo(() => {
-    const total = attendance.length;
-    const present = attendance.filter((a) => a.status === "Present").length;
-    const absent = attendance.filter((a) => a.status === "Absent").length;
+    const total = attendanceList.length;
+    const present = attendanceList.filter((a) => a.status === "Present").length;
+    const absent = attendanceList.filter((a) => a.status === "Absent").length;
     return { total, present, absent };
-  }, [attendance]);
-
-  function validate(): boolean {
-    const errs: Record<string, string> = {};
-    if (!selectedEmployeeId) errs.employee = "Please select an employee";
-    if (!date) errs.date = "Date is required";
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
-  }
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!validate()) return;
-    markAttendance({
-      employeeId: selectedEmployeeId,
-      date,
-      status,
-    });
-    setSelectedEmployeeId("");
-    setDate(new Date().toISOString().split("T")[0]);
-    setStatus("Present");
-    setErrors({});
-    setDialogOpen(false);
-  }
-
-  function getEmployeeName(id: string) {
-    return employees.find((e) => e.id === id)?.fullName ?? "Unknown";
-  }
-
-  function getEmployeeInitials(id: string) {
-    const name = getEmployeeName(id);
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("");
-  }
+  }, [attendanceList]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -129,6 +147,7 @@ export function AttendanceManagement() {
             Track and manage employee attendance records.
           </p>
         </div>
+
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2">
@@ -143,47 +162,59 @@ export function AttendanceManagement() {
                 Record attendance for an employee.
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <form
+              onSubmit={formik.handleSubmit}
+              className="flex flex-col gap-4"
+            >
               <div className="flex flex-col gap-1.5">
                 <Label className="flex items-center gap-1.5 text-sm">
                   <User className="size-3.5" />
                   Employee
                 </Label>
                 <Select
-                  value={selectedEmployeeId}
-                  onValueChange={setSelectedEmployeeId}
+                  value={formik.values.emp_id}
+                  onValueChange={(val) => formik.setFieldValue("emp_id", val)}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger
+                    className="w-full"
+                    onBlur={() => formik.setFieldTouched("emp_id", true)}
+                  >
                     <SelectValue placeholder="Select employee" />
                   </SelectTrigger>
                   <SelectContent>
-                    {employees.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id}>
-                        {emp.fullName} ({emp.id})
+                    {employeesList.map((emp) => (
+                      <SelectItem key={emp.emp_id} value={emp.emp_id}>
+                        {emp.name} ({emp.emp_id})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.employee && (
-                  <p className="text-xs text-destructive">{errors.employee}</p>
+                {formik.touched.emp_id && formik.errors.emp_id && (
+                  <p className="text-xs text-destructive">
+                    {formik.errors.emp_id}
+                  </p>
                 )}
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label
-                  htmlFor="attDate"
+                  htmlFor="date"
                   className="flex items-center gap-1.5 text-sm"
                 >
                   <CalendarCheck className="size-3.5" />
                   Date
                 </Label>
                 <Input
-                  id="attDate"
+                  id="date"
+                  name="date"
                   type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  value={formik.values.date}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                 />
-                {errors.date && (
-                  <p className="text-xs text-destructive">{errors.date}</p>
+                {formik.touched.date && formik.errors.date && (
+                  <p className="text-xs text-destructive">
+                    {formik.errors.date}
+                  </p>
                 )}
               </div>
               <div className="flex flex-col gap-1.5">
@@ -191,9 +222,9 @@ export function AttendanceManagement() {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setStatus("Present")}
+                    onClick={() => formik.setFieldValue("status", "Present")}
                     className={`flex flex-1 items-center justify-center gap-2 rounded-lg border-2 p-3 text-sm font-medium transition-colors ${
-                      status === "Present"
+                      formik.values.status === "Present"
                         ? "border-emerald-500 bg-emerald-50 text-emerald-700"
                         : "border-border bg-card text-muted-foreground hover:border-emerald-300"
                     }`}
@@ -203,9 +234,9 @@ export function AttendanceManagement() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setStatus("Absent")}
+                    onClick={() => formik.setFieldValue("status", "Absent")}
                     className={`flex flex-1 items-center justify-center gap-2 rounded-lg border-2 p-3 text-sm font-medium transition-colors ${
-                      status === "Absent"
+                      formik.values.status === "Absent"
                         ? "border-amber-500 bg-amber-50 text-amber-700"
                         : "border-border bg-card text-muted-foreground hover:border-amber-300"
                     }`}
@@ -221,7 +252,7 @@ export function AttendanceManagement() {
                   variant="outline"
                   onClick={() => {
                     setDialogOpen(false);
-                    setErrors({});
+                    formik.resetForm();
                   }}
                 >
                   Cancel
@@ -288,53 +319,13 @@ export function AttendanceManagement() {
               <CalendarCheck className="size-4 text-primary" />
               Attendance Records
               <Badge variant="secondary" className="ml-1 font-normal">
-                {filteredRecords.length}
+                {attendanceList.length}
               </Badge>
             </CardTitle>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 w-full sm:w-48 bg-muted/50 border-transparent focus-visible:border-primary"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Select
-                  value={filterEmployee}
-                  onValueChange={setFilterEmployee}
-                >
-                  <SelectTrigger className="w-full sm:w-40">
-                    <Filter className="size-3.5 mr-1" />
-                    <SelectValue placeholder="Employee" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Employees</SelectItem>
-                    {employees.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id}>
-                        {emp.fullName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="w-full sm:w-32">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="Present">Present</SelectItem>
-                    <SelectItem value="Absent">Absent</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {filteredRecords.length === 0 ? (
+          {sortedRecords.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
               <div className="rounded-full bg-muted p-3 mb-3">
                 <CalendarCheck className="size-6 text-muted-foreground" />
@@ -343,11 +334,7 @@ export function AttendanceManagement() {
                 No attendance records found
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {searchQuery ||
-                filterEmployee !== "all" ||
-                filterStatus !== "all"
-                  ? "Try adjusting your filters."
-                  : "Mark attendance to get started."}
+                Mark attendance to get started.
               </p>
             </div>
           ) : (
@@ -364,20 +351,20 @@ export function AttendanceManagement() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredRecords.map((record, i) => (
-                    <TableRow key={`${record.employeeId}-${record.date}-${i}`}>
+                  {sortedRecords.map((record, i) => (
+                    <TableRow key={`${record.emp_id}-${record.date}-${i}`}>
                       <TableCell>
                         <div className="flex items-center gap-2.5">
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                            {getEmployeeInitials(record.employeeId)}
+                            {getEmployeeInitials(record.emp_id)}
                           </div>
                           <span className="font-medium text-foreground">
-                            {getEmployeeName(record.employeeId)}
+                            {getEmployeeName(record.emp_id)}
                           </span>
                         </div>
                       </TableCell>
                       <TableCell className="hidden sm:table-cell font-mono text-xs text-muted-foreground">
-                        {record.employeeId}
+                        {record.emp_id}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {new Date(record.date + "T00:00:00").toLocaleDateString(
