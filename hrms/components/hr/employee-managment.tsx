@@ -66,7 +66,7 @@ const departments = [
 const emptyForm = { id: "", fullName: "", email: "", department: "" };
 
 export function EmployeeManagement() {
-  const { addEmployee, deleteEmployee } = useHR(); // Kept for your future POST/DELETE logic
+  const { addEmployee, deleteEmployee } = useHR();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
