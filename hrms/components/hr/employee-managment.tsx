@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useFormik } from "formik";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,9 +52,13 @@ import {
   Building,
   Hash,
 } from "lucide-react";
-import { useHR } from "@/lib/hr-store";
-// 1. Imported the delete API here
-import { fetchEmployees, deleteEmployeeApi } from "@/services/apis";
+
+// Ensure you import addEmployeeApi alongside fetch and delete
+import {
+  fetchEmployees,
+  deleteEmployeeApi,
+  addEmployeeApi,
+} from "@/services/apis";
 
 const departments = [
   "Engineering",
@@ -64,13 +70,8 @@ const departments = [
   "Sales",
 ];
 
-const emptyForm = { id: "", fullName: "", email: "", department: "" };
-
 export function EmployeeManagement() {
-  const { addEmployee } = useHR(); // Kept for your Add Employee logic (for now)
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState(emptyForm);
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
   type Employee = {
     emp_id: string;
@@ -81,6 +82,7 @@ export function EmployeeManagement() {
 
   const [employeesList, setEmployeesList] = useState<Employee[]>([]);
 
+  // --- API: Load Employees ---
   const loadEmployees = useCallback(async () => {
     const apiResponse = await fetchEmployees();
     if (Array.isArray(apiResponse)) {
@@ -94,10 +96,11 @@ export function EmployeeManagement() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // eslint-disable-next-line
     loadEmployees();
   }, [loadEmployees]);
 
+  // --- API: Delete Employee ---
   const handleDelete = async (emp_id: string) => {
     const success = await deleteEmployeeApi(emp_id);
     if (success) {
@@ -105,19 +108,54 @@ export function EmployeeManagement() {
     }
   };
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  // --- FORMIK: Add Employee ---
+  const formik = useFormik({
+    initialValues: {
+      emp_id: "",
+      name: "",
+      email: "",
+      department: "",
+    },
+    validate: (values) => {
+      const errors: Record<string, string> = {};
+      if (!values.emp_id.trim()) errors.emp_id = "Employee ID is required";
+      if (!values.name.trim()) errors.name = "Full Name is required";
+      if (!values.email.trim()) {
+        errors.email = "Email is required";
+      } else if (
+        !/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i.test(values.email)
+      ) {
+        errors.email = "Invalid email address";
+      }
+      if (!values.department) errors.department = "Department is required";
+      return errors;
+    },
+    onSubmit: async (values, { resetForm }) => {
+      // 1. Show loading toast
+      const toastId = toast.loading("Adding employee...");
 
-    addEmployee({
-      id: form.id.trim(),
-      fullName: form.fullName.trim(),
-      email: form.email.trim(),
-      department: form.department,
-    });
-    setForm(emptyForm);
-    setErrors({});
-    setDialogOpen(false);
-  }
+      // 2. Call your POST API
+      const apiResponse = await addEmployeeApi({
+        emp_id: values.emp_id.trim(),
+        name: values.name.trim(),
+        email: values.email.trim(),
+        department: values.department,
+      });
+
+      // 3. Handle response
+      if (apiResponse) {
+        toast.success("Employee added successfully!", { id: toastId });
+        resetForm();
+        setDialogOpen(false);
+        loadEmployees(); // Refresh the table
+      } else {
+        toast.error(
+          "Failed to add employee. ID or Email might already exist.",
+          { id: toastId },
+        );
+      }
+    },
+  });
 
   function getDepartmentColor(dept: string) {
     const colors: Record<string, string> = {
@@ -158,47 +196,56 @@ export function EmployeeManagement() {
                 Fill in the details to add a new team member.
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <form
+              onSubmit={formik.handleSubmit}
+              className="flex flex-col gap-4"
+            >
               <div className="flex flex-col gap-1.5">
                 <Label
-                  htmlFor="empId"
+                  htmlFor="emp_id"
                   className="flex items-center gap-1.5 text-sm"
                 >
                   <Hash className="size-3.5" />
                   Employee ID
                 </Label>
                 <Input
-                  id="empId"
+                  id="emp_id"
+                  name="emp_id"
                   placeholder="e.g. EMP006"
-                  value={form.id}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, id: e.target.value }))
-                  }
+                  value={formik.values.emp_id}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                 />
-                {errors.id && (
-                  <p className="text-xs text-destructive">{errors.id}</p>
+                {formik.touched.emp_id && formik.errors.emp_id && (
+                  <p className="text-xs text-destructive">
+                    {formik.errors.emp_id}
+                  </p>
                 )}
               </div>
+
               <div className="flex flex-col gap-1.5">
                 <Label
-                  htmlFor="fullName"
+                  htmlFor="name"
                   className="flex items-center gap-1.5 text-sm"
                 >
                   <UserCircle className="size-3.5" />
                   Full Name
                 </Label>
                 <Input
-                  id="fullName"
+                  id="name"
+                  name="name"
                   placeholder="e.g. Jane Smith"
-                  value={form.fullName}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, fullName: e.target.value }))
-                  }
+                  value={formik.values.name}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                 />
-                {errors.fullName && (
-                  <p className="text-xs text-destructive">{errors.fullName}</p>
+                {formik.touched.name && formik.errors.name && (
+                  <p className="text-xs text-destructive">
+                    {formik.errors.name}
+                  </p>
                 )}
               </div>
+
               <div className="flex flex-col gap-1.5">
                 <Label
                   htmlFor="email"
@@ -209,29 +256,35 @@ export function EmployeeManagement() {
                 </Label>
                 <Input
                   id="email"
+                  name="email"
                   type="email"
                   placeholder="e.g. jane@company.com"
-                  value={form.email}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, email: e.target.value }))
-                  }
+                  value={formik.values.email}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                 />
-                {errors.email && (
-                  <p className="text-xs text-destructive">{errors.email}</p>
+                {formik.touched.email && formik.errors.email && (
+                  <p className="text-xs text-destructive">
+                    {formik.errors.email}
+                  </p>
                 )}
               </div>
+
               <div className="flex flex-col gap-1.5">
                 <Label className="flex items-center gap-1.5 text-sm">
                   <Building className="size-3.5" />
                   Department
                 </Label>
                 <Select
-                  value={form.department}
-                  onValueChange={(v) =>
-                    setForm((f) => ({ ...f, department: v }))
+                  value={formik.values.department}
+                  onValueChange={(val) =>
+                    formik.setFieldValue("department", val)
                   }
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger
+                    className="w-full"
+                    onBlur={() => formik.setFieldTouched("department", true)}
+                  >
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
@@ -242,9 +295,9 @@ export function EmployeeManagement() {
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.department && (
+                {formik.touched.department && formik.errors.department && (
                   <p className="text-xs text-destructive">
-                    {errors.department}
+                    {formik.errors.department}
                   </p>
                 )}
               </div>
@@ -254,8 +307,7 @@ export function EmployeeManagement() {
                   variant="outline"
                   onClick={() => {
                     setDialogOpen(false);
-                    setForm(emptyForm);
-                    setErrors({});
+                    formik.resetForm();
                   }}
                 >
                   Cancel
@@ -366,7 +418,6 @@ export function EmployeeManagement() {
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              {/* 3. Replaced the old delete method with our new async handler */}
                               <AlertDialogAction
                                 onClick={() => handleDelete(emp.emp_id)}
                                 className="bg-destructive text-white hover:bg-destructive/90"
