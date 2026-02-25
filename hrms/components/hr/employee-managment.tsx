@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,13 +45,13 @@ import {
   Plus,
   Trash2,
   Users,
-  Search,
   UserCircle,
   Mail,
   Building,
   Hash,
 } from "lucide-react";
 import { useHR } from "@/lib/hr-store";
+import { fetchEmployees } from "@/services/apis";
 
 const departments = [
   "Engineering",
@@ -66,37 +66,40 @@ const departments = [
 const emptyForm = { id: "", fullName: "", email: "", department: "" };
 
 export function EmployeeManagement() {
-  const { employees, addEmployee, deleteEmployee } = useHR();
+  const { addEmployee, deleteEmployee } = useHR(); // Kept for your future POST/DELETE logic
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [search, setSearch] = useState("");
 
-  const filteredEmployees = employees.filter(
-    (e) =>
-      e.fullName.toLowerCase().includes(search.toLowerCase()) ||
-      e.id.toLowerCase().includes(search.toLowerCase()) ||
-      e.department.toLowerCase().includes(search.toLowerCase()) ||
-      e.email.toLowerCase().includes(search.toLowerCase()),
-  );
+  type Employee = {
+    emp_id: string;
+    name: string;
+    email: string;
+    department: string;
+  };
 
-  function validate(): boolean {
-    const errs: Record<string, string> = {};
-    if (!form.id.trim()) errs.id = "Employee ID is required";
-    else if (employees.some((e) => e.id === form.id.trim()))
-      errs.id = "Employee ID already exists";
-    if (!form.fullName.trim()) errs.fullName = "Full name is required";
-    if (!form.email.trim()) errs.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
-      errs.email = "Invalid email format";
-    if (!form.department) errs.department = "Department is required";
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
-  }
+  const [employeesList, setEmployeesList] = useState<Employee[]>([]);
+
+  const loadEmployees = useCallback(async () => {
+    const apiResponse = await fetchEmployees();
+    if (Array.isArray(apiResponse)) {
+      setEmployeesList(apiResponse);
+    } else if (apiResponse && Array.isArray(apiResponse.data)) {
+      setEmployeesList(apiResponse.data);
+    } else {
+      console.error("API did not return an array. It returned:", apiResponse);
+      setEmployeesList([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadEmployees();
+  }, [loadEmployees]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!validate()) return;
+
     addEmployee({
       id: form.id.trim(),
       fullName: form.fullName.trim(),
@@ -132,6 +135,7 @@ export function EmployeeManagement() {
             Manage your team members and their details.
           </p>
         </div>
+
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2">
@@ -262,22 +266,13 @@ export function EmployeeManagement() {
               <Users className="size-4 text-primary" />
               Employee Directory
               <Badge variant="secondary" className="ml-1 font-normal">
-                {employees.length}
+                {employeesList.length}
               </Badge>
             </CardTitle>
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search employees..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 bg-muted/50 border-transparent focus-visible:border-primary"
-              />
-            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {filteredEmployees.length === 0 ? (
+          {employeesList.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
               <div className="rounded-full bg-muted p-3 mb-3">
                 <Users className="size-6 text-muted-foreground" />
@@ -286,9 +281,7 @@ export function EmployeeManagement() {
                 No employees found
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {search
-                  ? "Try adjusting your search query."
-                  : "Add your first employee to get started."}
+                Add your first employee to get started.
               </p>
             </div>
           ) : (
@@ -308,21 +301,21 @@ export function EmployeeManagement() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredEmployees.map((emp) => (
-                    <TableRow key={emp.id}>
+                  {employeesList.map((emp) => (
+                    <TableRow key={emp.emp_id}>
                       <TableCell className="font-mono text-xs font-medium text-muted-foreground">
-                        {emp.id}
+                        {emp.emp_id}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2.5">
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                            {emp.fullName
+                            {emp.name
                               .split(" ")
-                              .map((n) => n[0])
+                              .map((n: string) => n[0])
                               .join("")}
                           </div>
                           <span className="font-medium text-foreground">
-                            {emp.fullName}
+                            {emp.name}
                           </span>
                         </div>
                       </TableCell>
@@ -346,9 +339,7 @@ export function EmployeeManagement() {
                               className="text-muted-foreground hover:text-destructive"
                             >
                               <Trash2 className="size-4" />
-                              <span className="sr-only">
-                                Delete {emp.fullName}
-                              </span>
+                              <span className="sr-only">Delete {emp.name}</span>
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
@@ -359,7 +350,7 @@ export function EmployeeManagement() {
                               <AlertDialogDescription>
                                 Are you sure you want to delete{" "}
                                 <span className="font-semibold text-foreground">
-                                  {emp.fullName}
+                                  {emp.name}
                                 </span>
                                 ? This will also remove all their attendance
                                 records. This action cannot be undone.
@@ -368,7 +359,7 @@ export function EmployeeManagement() {
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction
-                                onClick={() => deleteEmployee(emp.id)}
+                                onClick={() => deleteEmployee(emp.emp_id)}
                                 className="bg-destructive text-white hover:bg-destructive/90"
                               >
                                 Delete
