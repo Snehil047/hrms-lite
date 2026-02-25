@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HRMS Lite
 
-## Getting Started
+## Project Overview
 
-First, run the development server:
+HRMS Lite is a web-based basic internal Human Resource Management System. It provides a simple, usable, and professional interface for administrators to manage essential HR operations.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+The application is divided into two core modules:
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. **Employee Management:** Allows the admin to add new employees (with unique IDs, valid emails, and department mapping), view a complete directory, and safely delete records.
+2. **Attendance Management:** Allows the admin to track daily attendance, mark employees as Present or Absent for specific dates, and view comprehensive attendance histories.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Tech Stack Used
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This project is built using a modern full-stack architecture:
 
-## Learn More
+**Frontend:**
 
-To learn more about Next.js, take a look at the following resources:
+- **Framework:** Next.js (React)
+- **Styling:** Tailwind CSS & shadcn/ui
+- **Form Handling & Validation:** Formik
+- **HTTP Client:** Axios
+- **Notifications:** Sonner (Toast notifications)
+- **Icons:** Lucide React
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Backend & Database:**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Framework:** FastAPI (Python)
+- **ORM:** SQLAlchemy
+- **Data Validation:** Pydantic
+- **Database:** SQLite (Local Development) / PostgreSQL (Production)
 
-## Deploy on Vercel
+## Steps to Run the Project Locally
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Prerequisites
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Node.js (v18+ recommended)
+- Python (3.8+ recommended)
+
+### 1. Backend Setup for Local Env
+
+1. Open a terminal and navigate to the backend directory:
+   ```bash
+   cd backend
+   run pip install -r requirements.txt
+   uvicorn main:app --reload
+   The backend API is now running at http://127.0.0.1:8000
+   ```
+
+### 2. Frontend Setup
+
+1. Open a new, separate terminal window and navigate to your frontend directory:
+
+   cd hrms
+   npm install
+   Create a new file named exactly .env.local in the root of your frontend folder.
+   NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+   npm run dev
