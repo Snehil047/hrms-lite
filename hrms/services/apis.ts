@@ -12,3 +12,17 @@ export const fetchEmployees = async () => {
     return null;
   }
 };
+
+export const deleteEmployeeApi = async (emp_id: string) => {
+  try {
+    const response = await axios.delete(`${API_BASE_URL}/employees/${emp_id}`);
+    if (response.status === 204) {
+      toast.success("Employee deleted successfully.");
+      return true;
+    }
+    return false;
+  } catch (error) {
+    toast.error("Failed to delete employee.");
+    return false;
+  }
+};

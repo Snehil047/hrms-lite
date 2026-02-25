@@ -51,7 +51,8 @@ import {
   Hash,
 } from "lucide-react";
 import { useHR } from "@/lib/hr-store";
-import { fetchEmployees } from "@/services/apis";
+// 1. Imported the delete API here
+import { fetchEmployees, deleteEmployeeApi } from "@/services/apis";
 
 const departments = [
   "Engineering",
@@ -66,7 +67,7 @@ const departments = [
 const emptyForm = { id: "", fullName: "", email: "", department: "" };
 
 export function EmployeeManagement() {
-  const { addEmployee, deleteEmployee } = useHR();
+  const { addEmployee } = useHR(); // Kept for your Add Employee logic (for now)
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -96,6 +97,13 @@ export function EmployeeManagement() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadEmployees();
   }, [loadEmployees]);
+
+  const handleDelete = async (emp_id: string) => {
+    const success = await deleteEmployeeApi(emp_id);
+    if (success) {
+      loadEmployees();
+    }
+  };
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -358,8 +366,9 @@ export function EmployeeManagement() {
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              {/* 3. Replaced the old delete method with our new async handler */}
                               <AlertDialogAction
-                                onClick={() => deleteEmployee(emp.emp_id)}
+                                onClick={() => handleDelete(emp.emp_id)}
                                 className="bg-destructive text-white hover:bg-destructive/90"
                               >
                                 Delete
