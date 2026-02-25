@@ -101,7 +101,6 @@ export function AppSidebar({
               <span className="text-xs font-semibold text-sidebar-foreground">
                 Your Company
               </span>
-              <span className="text-xs text-muted-foreground">5 employees</span>
             </div>
           </div>
         </div>

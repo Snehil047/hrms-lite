@@ -1,6 +1,6 @@
 "use client";
 
-import { useHR } from "@/lib/hr-store";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Users,
   CalendarCheck,
@@ -12,18 +12,47 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useMemo } from "react";
+
+// Import your API services
+import { fetchEmployees, getAllAttendanceApi } from "@/services/apis";
 
 interface DashboardProps {
   onNavigate: (tab: string) => void;
 }
 
+// Define the types matching your API responses
+type Employee = {
+  emp_id: string;
+  name: string;
+  email: string;
+  department: string;
+};
+type Attendance = { id?: number; emp_id: string; date: string; status: string };
+
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const { employees, attendance } = useHR();
+  const [employeesList, setEmployeesList] = useState<Employee[]>([]);
+  const [attendanceList, setAttendanceList] = useState<Attendance[]>([]);
+
+  const loadData = useCallback(async () => {
+    const emps = await fetchEmployees();
+    if (Array.isArray(emps)) setEmployeesList(emps);
+    else if (emps?.data && Array.isArray(emps.data))
+      setEmployeesList(emps.data);
+
+    const atts = await getAllAttendanceApi();
+    if (Array.isArray(atts)) setAttendanceList(atts);
+    else if (atts?.data && Array.isArray(atts.data))
+      setAttendanceList(atts.data);
+  }, []);
+
+  useEffect(() => {
+    //eslint-disable-next-line
+    loadData();
+  }, [loadData]);
 
   const stats = useMemo(() => {
     const today = new Date().toISOString().split("T")[0];
-    const todayRecords = attendance.filter((a) => a.date === today);
+    const todayRecords = attendanceList.filter((a) => a.date === today);
     const presentToday = todayRecords.filter(
       (a) => a.status === "Present",
     ).length;
@@ -35,20 +64,22 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         ? Math.round((presentToday / todayRecords.length) * 100)
         : 0;
     return { presentToday, absentToday, attendanceRate };
-  }, [attendance]);
+  }, [attendanceList]);
 
   const recentActivity = useMemo(() => {
-    const sorted = [...attendance].sort((a, b) => b.date.localeCompare(a.date));
+    const sorted = [...attendanceList].sort((a, b) =>
+      b.date.localeCompare(a.date),
+    );
     return sorted.slice(0, 5).map((record) => {
-      const emp = employees.find((e) => e.id === record.employeeId);
-      return { ...record, employeeName: emp?.fullName ?? "Unknown" };
+      const emp = employeesList.find((e) => e.emp_id === record.emp_id);
+      return { ...record, employeeName: emp?.name ?? "Unknown" };
     });
-  }, [attendance, employees]);
+  }, [attendanceList, employeesList]);
 
   const statCards = [
     {
       title: "Total Employees",
-      value: employees.length,
+      value: employeesList.length,
       icon: Users,
       description: "Active workforce",
       accent: "bg-primary/10 text-primary",
@@ -125,7 +156,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <CardContent className="flex flex-col gap-2 pb-5">
             <button
               onClick={() => onNavigate("employees")}
-              className="flex items-center justify-between rounded-lg border border-border/60 bg-card p-3.5 text-left transition-colors hover:bg-accent group"
+              className="flex items-center justify-between rounded-lg border border-border/60 bg-card p-3.5 text-left transition-colors hover:bg-accent group cursor-pointer"
             >
               <div className="flex items-center gap-3">
                 <div className="rounded-md bg-primary/10 p-2">
@@ -144,7 +175,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </button>
             <button
               onClick={() => onNavigate("attendance")}
-              className="flex items-center justify-between rounded-lg border border-border/60 bg-card p-3.5 text-left transition-colors hover:bg-accent group"
+              className="flex items-center justify-between rounded-lg border border-border/60 bg-card p-3.5 text-left transition-colors hover:bg-accent group cursor-pointer"
             >
               <div className="flex items-center gap-3">
                 <div className="rounded-md bg-emerald-100 p-2">
@@ -163,7 +194,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </button>
             <button
               onClick={() => onNavigate("attendance")}
-              className="flex items-center justify-between rounded-lg border border-border/60 bg-card p-3.5 text-left transition-colors hover:bg-accent group"
+              className="flex items-center justify-between rounded-lg border border-border/60 bg-card p-3.5 text-left transition-colors hover:bg-accent group cursor-pointer"
             >
               <div className="flex items-center gap-3">
                 <div className="rounded-md bg-amber-100 p-2">
@@ -207,15 +238,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <div className="flex flex-col gap-3">
                 {recentActivity.map((record, i) => (
                   <div
-                    key={`${record.employeeId}-${record.date}-${i}`}
+                    key={`${record.emp_id}-${record.date}-${i}`}
                     className="flex items-center justify-between rounded-lg border border-border/60 p-3"
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                        {record.employeeName
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
+                        {record.employeeName === "Unknown"
+                          ? "?"
+                          : record.employeeName
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .substring(0, 2)}
                       </div>
                       <div>
                         <p className="text-sm font-medium text-foreground">

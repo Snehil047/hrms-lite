@@ -150,7 +150,7 @@ export function AttendanceManagement() {
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button className="gap-2 cursor-pointer">
               <Plus className="size-4" />
               Mark Attendance
             </Button>
