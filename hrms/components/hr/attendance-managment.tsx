@@ -38,10 +38,12 @@ import {
   fetchEmployees,
   getAllAttendanceApi,
   addAttendanceApi,
+  getEmployeeAttendanceApi,
 } from "@/services/apis";
 
 export function AttendanceManagement() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [recordsDialogOpen, setRecordsDialogOpen] = useState(false);
 
   type Employee = {
     emp_id: string;
@@ -58,6 +60,11 @@ export function AttendanceManagement() {
 
   const [employeesList, setEmployeesList] = useState<Employee[]>([]);
   const [attendanceList, setAttendanceList] = useState<Attendance[]>([]);
+
+  const [selectedEmpName, setSelectedEmpName] = useState("");
+  const [selectedEmpRecords, setSelectedEmpRecords] = useState<Attendance[]>(
+    [],
+  );
 
   const loadData = useCallback(async () => {
     const emps = await fetchEmployees();
@@ -109,6 +116,20 @@ export function AttendanceManagement() {
       }
     },
   });
+
+  const handleRowClick = async (emp_id: string, name: string) => {
+    setSelectedEmpName(name);
+    const data = await getEmployeeAttendanceApi(emp_id);
+
+    if (Array.isArray(data)) {
+      setSelectedEmpRecords(data);
+    } else if (data?.data && Array.isArray(data.data)) {
+      setSelectedEmpRecords(data.data);
+    } else {
+      setSelectedEmpRecords([]);
+    }
+    setRecordsDialogOpen(true);
+  };
 
   function getEmployeeName(emp_id: string) {
     return employeesList.find((e) => e.emp_id === emp_id)?.name ?? "Unknown";
@@ -322,6 +343,9 @@ export function AttendanceManagement() {
                 {attendanceList.length}
               </Badge>
             </CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Click on an Employee to view their attendance history.
+            </p>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -352,7 +376,16 @@ export function AttendanceManagement() {
                 </TableHeader>
                 <TableBody>
                   {sortedRecords.map((record, i) => (
-                    <TableRow key={`${record.emp_id}-${record.date}-${i}`}>
+                    <TableRow
+                      key={`${record.emp_id}-${record.date}-${i}`}
+                      onClick={() =>
+                        handleRowClick(
+                          record.emp_id,
+                          getEmployeeName(record.emp_id),
+                        )
+                      }
+                      className="cursor-pointer transition-colors hover:bg-muted/50"
+                    >
                       <TableCell>
                         <div className="flex items-center gap-2.5">
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
@@ -402,6 +435,67 @@ export function AttendanceManagement() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={recordsDialogOpen} onOpenChange={setRecordsDialogOpen}>
+        <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Records: {selectedEmpName}</DialogTitle>
+            <DialogDescription>
+              Complete attendance history for this employee.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            {selectedEmpRecords.length === 0 ? (
+              <p className="text-sm text-center text-muted-foreground py-6">
+                No history found.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[...selectedEmpRecords]
+                    .sort((a, b) => b.date.localeCompare(a.date))
+                    .map((rec, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="text-sm">
+                          {new Date(rec.date + "T00:00:00").toLocaleDateString(
+                            "en-US",
+                            {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            },
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={
+                              rec.status === "Present"
+                                ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                                : "bg-amber-100 text-amber-700 border-amber-200"
+                            }
+                          >
+                            {rec.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setRecordsDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

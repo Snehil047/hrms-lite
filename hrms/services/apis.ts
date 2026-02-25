@@ -90,3 +90,12 @@ export const addAttendanceApi = async (formData: {
     return { success: false, message: "An unexpected error occurred" };
   }
 };
+
+export const getEmployeeAttendanceApi = async (emp_id: string) => {
+  try {
+    const { data } = await axios.get(`${API_BASE_URL}/attendance/${emp_id}`);
+    return data;
+  } catch (error) {
+    return null;
+  }
+};
